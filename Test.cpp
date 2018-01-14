@@ -19,8 +19,8 @@ using namespace clustering;
 
 // MARK: Settings
 struct Constant {
-	static constexpr auto dimNum = 20;
-	static constexpr auto batchSize = 10000;
+	static constexpr auto dimNum = 5;//20;
+	static constexpr auto batchSize = 1103;//10000;
 	static constexpr auto centerCount = 10;
 	static constexpr auto benchRuns = 10;
 };
@@ -67,8 +67,9 @@ void kmeansTest() {
 	std::vector<VSpace::ElementsBatch::size_type> elementToClusterMap(elements.size());
 	// init random generator
 	std::default_random_engine rengine;
-	std::uniform_real_distribution<VSpace::BaseType> distribution(0.0,1.0);
+	std::uniform_real_distribution<VSpace::BaseType> distribution(0.0, 1.0);
 	VSpace::RandomGenerator generator = [&rengine, &distribution] { return distribution(rengine); };
+	ctpl::thread_pool tpool(std::thread::hardware_concurrency());
 	
 	// generate random data but with very explicit clusters so its easy to test
 	int num = 0;
@@ -86,7 +87,7 @@ void kmeansTest() {
 	}
 	
 	// do clustering
-	REQUIRE(VSpace::kmeans<norm>(elements, termCriteria, generator, centers, elementToClusterMap));
+	REQUIRE(VSpace::kmeans<norm>(elements, termCriteria, tpool, generator, centers, elementToClusterMap));
 	
 	// check that every cluster center is unique
 	REQUIRE(std::unique(centers.begin(), centers.end()) == centers.end());
@@ -123,6 +124,7 @@ void kmeansBench() {
 	std::default_random_engine rengine;
 	std::uniform_real_distribution<VSpace::BaseType> distribution(0.0,1.0);
 	VSpace::RandomGenerator generator = [&rengine, &distribution] { return distribution(rengine); };
+	ctpl::thread_pool tpool(std::thread::hardware_concurrency());
 	
 	// generate random data
 	for(auto& elem : elements) {
@@ -136,7 +138,7 @@ void kmeansBench() {
 	
 	for(int i = 0; i < Constant::benchRuns; ++i) {
 		// do clustering
-		REQUIRE(VSpace::kmeans<norm>(elements, termCriteria, generator, centers, elementToClusterMap));
+		REQUIRE(VSpace::kmeans<norm>(elements, termCriteria, tpool, generator, centers, elementToClusterMap));
 	}
 	
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::high_resolution_clock::now() - t1 ).count();

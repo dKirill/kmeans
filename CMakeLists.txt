@@ -22,12 +22,15 @@ set(CMAKE_CXX_FLAGS
     -Wsign-conversion
     -Wsign-promo
     -Wno-unused-function")
-
+set(CMAKE_CXX_FLAGS "-std=c++1z")
 # create interface lib
 set(KMEANS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/kmeans)
+set(HEADERS 
+	${KMEANS_INCLUDE_DIR}/kmeans.hpp 
+	${KMEANS_INCLUDE_DIR}/ctpl_stl.h)
 add_library(kmeans INTERFACE)
-target_sources(kmeans INTERFACE ${KMEANS_INCLUDE_DIR}/kmeans.hpp)
-source_group("Public headers" FILES ${KMEANS_INCLUDE_DIR}/kmeans.hpp)
+target_sources(kmeans INTERFACE ${HEADERS})
+source_group("Public headers" FILES ${HEADERS})
 target_include_directories(kmeans INTERFACE ${KMEANS_INCLUDE_DIR})
 
 # Prepare "Catch" unit test library for other executables

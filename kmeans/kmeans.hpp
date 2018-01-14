@@ -12,8 +12,10 @@
 #include <cstdint>
 #include <iostream>
 #include <iterator>
+#include <thread>
 #include <utility>
 #include <vector>
+#include <ctpl_stl.h>
 
 #define OUT(x) std::cout << x << '\n';
 #define OUTELEM(x) {for(const auto& e : x) std::cout << e << ' '; std::cout << '\n';}
@@ -64,14 +66,16 @@ namespace clustering {
 		/// @tparam distance is norm function to use (is crucial to performance of algorithm so making it template param is an attempt to maximize inlining chances)
 		/// @param elements subset of vectors to cluster.
 		/// @param termCriteria criteria to end algorithm.
+		/// @param tpool threadpool to use, should be of desired size
 		/// @param [in, out] generator function that generates uniform random numbers
-		/// @param [in, out] centerIdxs vector of cluster centers where index is cluster index and value is center. Size is desired number of clusters
+		/// @param [in, out] centers vector of cluster centers where index is cluster index and value is center. Size is desired number of clusters
 		/// @param [out] elementToClusterMap vector that maps every element to its cluster. Index is index of @ref elements and value is id of cluster its element is appointed to (index of @ref centers). Must be of the same size as @ref elements.
 		/// @return true on success, false on failure
 		template<Norm distance>
 		static bool kmeans(
 						   const ElementsBatch& elements,
 						   const TerminationCriteria& termCriteria,
+						   ctpl::thread_pool& tpool,
 						   RandomGenerator& generator,
 						   std::vector<Element>& centers,
 						   std::vector<typename std::vector<Element>::size_type>& elementToClusterMap) {
@@ -86,6 +90,11 @@ namespace clustering {
 				
 				if(termCriteria.maxNumberOfIterations > 1 && termCriteria.epsilon <= 0) {
 					OUT("termination criteria is incorrect");
+					return false;
+				}
+				
+				if(tpool.size() < 1) {
+					OUT("Number of threads should be over 0");
 					return false;
 				}
 				
@@ -111,22 +120,48 @@ namespace clustering {
 				centers[0] = elements[firstCenter];
 				
 				for(size_t cidx = 1; cidx < centers.size(); ++cidx) {
+					std::vector<std::future<void>> futures;
+					
+					futures.reserve(tpool.size());
+					
 					// 2. for every point calc its squared distance to closest already chosen centroid and sum of these squares
-					for(size_t eidx = 0; eidx < elements.size(); ++eidx) {
-						// calc distance to every chosen centroid and pick shortest
-						auto shortestDistSq = distance(elements[eidx], centers[0]);
-						
-						// square it
-						shortestDistSq *= shortestDistSq;
-						
-						for(size_t chosenIdx = 1; chosenIdx < cidx; ++chosenIdx) {
-							const auto dist = distance(elements[eidx], centers[chosenIdx]);
+					const auto task = [&elements, &centers, &sqdistances, cidx](size_t id, const auto firstidx, const auto lastidx) -> void {
+						OUT("Running task on thread#" + std::to_string(id) + " first=" + std::to_string(firstidx) + " last=" + std::to_string(lastidx));
+						for(size_t eidx = firstidx; eidx < lastidx; ++eidx) {
+							// calc distance to every chosen centroid and pick shortest
+							auto shortestDistSq = distance(elements[eidx], centers[0]);
 							
-							shortestDistSq = std::min(dist * dist, shortestDistSq);
+							// square it
+							shortestDistSq *= shortestDistSq;
+							
+							for(size_t chosenIdx = 1; chosenIdx < cidx; ++chosenIdx) {
+								const auto dist = distance(elements[eidx], centers[chosenIdx]);
+								
+								shortestDistSq = std::min(dist * dist, shortestDistSq);
+							}
+							
+							// add picked dist to sum
+							sqdistances[eidx] = shortestDistSq + (eidx > firstidx ? sqdistances[eidx - 1] : 0);
 						}
+					};
+					
+					// split into task for every thread
+					const auto blockSize = size_t(std::ceil(static_cast<float>(elements.size()) / tpool.size()) + 0.5);
+					
+					for(size_t eidx = 0; eidx < elements.size(); eidx += blockSize) {
+						futures.push_back(tpool.push(task, eidx, std::min(elements.size(), eidx + blockSize)));
+					}
+					
+					// wait until completion
+					for(const auto& future : futures)
+						future.wait();
+					
+					// sum results (start from second since nothing to add to first)
+					for(size_t block = 1; block < futures.size(); ++block) {
+						const auto prevBlockLast = size_t(block * blockSize - 1);
 						
-						// add picked dist to sum
-						sqdistances[eidx] = shortestDistSq + (eidx > 0 ? sqdistances[eidx - 1] : 0);
+						for(size_t idx = block * blockSize; idx < (block + 1) * blockSize && idx < elements.size(); ++idx)
+							sqdistances[idx] += sqdistances[prevBlockLast];
 					}
 					
 					// 3. pick next centroid using d^2 weighting
@@ -138,6 +173,8 @@ namespace clustering {
 				}
 			}
 			
+//			for(auto& c : centers)
+//				OUTELEM(c);
 			// MARK: kmeans clustering
 			{
 				auto iterNum = int32_t{0};
