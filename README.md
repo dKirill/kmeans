@@ -3,7 +3,14 @@ Basic header only kmeans clustering implementation
 
 Tested on XCode9
 
-# how to build&autorun tests
+# Preparation
+Do not forget to 
+```
+git submodule update --init --recursive
+```
+after clone, since Catch2 unit test framework is included as submodule
+
+# How to build&autorun tests
 ## makefile
 ```
 mkdir build-make && cd build-make
@@ -11,7 +18,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make
 ```
 
-## xcode
+## XCode
 ```
 mkdir build-xcode && cd build-xcode
 cmake .. -GXcode -DCMAKE_BUILD_TYPE=Release
