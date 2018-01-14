@@ -1,6 +1,8 @@
 # Intro
 Basic header only kmeans clustering implementation
 
+Algorithm is taken from [here](http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf)
+
 Tested on XCode9
 
 # Preparation
