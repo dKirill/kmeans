@@ -15,7 +15,7 @@ make
 ```
 mkdir build-xcode && cd build-xcode
 cmake .. -GXcode -DCMAKE_BUILD_TYPE=Release
-xcodebuild configuration Release
+xcodebuild -configuration Release
 ```
 
 # Regards
