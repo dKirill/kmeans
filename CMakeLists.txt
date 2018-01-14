@@ -23,13 +23,12 @@ set(CMAKE_CXX_FLAGS
     -Wsign-promo
     -Wno-unused-function")
 
-# set sources
-set(SOURCES kmeans.cpp)
-set(HEADERS kmeans.hpp)
-
-# create statis lib
-add_library(kmeans STATIC ${SOURCES} ${HEADERS})
-target_include_directories(kmeans INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+# create interface lib
+set(KMEANS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/kmeans)
+add_library(kmeans INTERFACE)
+target_sources(kmeans INTERFACE ${KMEANS_INCLUDE_DIR}/kmeans.hpp)
+source_group("Public headers" FILES ${KMEANS_INCLUDE_DIR}/kmeans.hpp)
+target_include_directories(kmeans INTERFACE ${KMEANS_INCLUDE_DIR})
 
 # Prepare "Catch" unit test library for other executables
 set(CATCH_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/extern/Catch2/single_include)
@@ -42,16 +41,15 @@ add_executable(tests ${TEST_SOURCES})
 target_link_libraries(tests PRIVATE Catch kmeans)
 
 # Run test automatically as post build step
-add_custom_command(
-     TARGET tests
-     COMMENT "Run kmeans tests"
-     POST_BUILD 
-     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-     COMMAND tests
-)
+#add_custom_command(
+ #    TARGET tests
+  #   COMMENT "Run kmeans tests"
+   #  POST_BUILD 
+    # WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+     #COMMAND tests
+#)
 
 # install
-install(TARGETS kmeans
-	ARCHIVE DESTINATION lib
-	INCLUDES DESTINATION include
+install(DIRECTORY ${KMEANS_INCLUDE_DIR}
+	PUBLIC_HEADER DESTINATION include
 )
