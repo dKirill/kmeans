@@ -22,7 +22,7 @@ set(CMAKE_CXX_FLAGS
     -Wsign-conversion
     -Wsign-promo
     -Wno-unused-function")
-set(CMAKE_CXX_FLAGS "-std=c++1z")
+
 # create interface lib
 set(KMEANS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/kmeans)
 set(HEADERS 

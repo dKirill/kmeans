@@ -73,7 +73,7 @@ namespace ctpl {
     public:
 
         thread_pool() { this->init(); }
-        thread_pool(int nThreads) { this->init(); this->resize(nThreads); }
+        thread_pool(size_t nThreads) { this->init(); this->resize(nThreads); }
 
         // the destructor waits for all the functions in the queue to be finished
         ~thread_pool() {
@@ -81,29 +81,29 @@ namespace ctpl {
         }
 
         // get the number of running threads in the pool
-        int size() { return static_cast<int>(this->threads.size()); }
+        size_t size() { return static_cast<size_t>(this->threads.size()); }
 
         // number of idle threads
         int n_idle() { return this->nWaiting; }
-        std::thread & get_thread(int i) { return *this->threads[i]; }
+        std::thread & get_thread(size_t i) { return *this->threads[i]; }
 
         // change the number of threads in the pool
         // should be called from one thread, otherwise be careful to not interleave, also with this->stop()
         // nThreads must be >= 0
-        void resize(int nThreads) {
+        void resize(size_t nThreads) {
             if (!this->isStop && !this->isDone) {
-                int oldNThreads = static_cast<int>(this->threads.size());
+                auto oldNThreads = static_cast<size_t>(this->threads.size());
                 if (oldNThreads <= nThreads) {  // if the number of threads is increased
                     this->threads.resize(nThreads);
                     this->flags.resize(nThreads);
 
-                    for (int i = oldNThreads; i < nThreads; ++i) {
+                    for (size_t i = oldNThreads; i < nThreads; ++i) {
                         this->flags[i] = std::make_shared<std::atomic<bool>>(false);
                         this->set_thread(i);
                     }
                 }
                 else {  // the number of threads is decreased
-                    for (int i = oldNThreads - 1; i >= nThreads; --i) {
+                    for (size_t i = oldNThreads - 1; i >= nThreads; --i) {
                         *this->flags[i] = true;  // this thread will finish
                         this->threads[i]->detach();
                     }
@@ -144,7 +144,7 @@ namespace ctpl {
                 if (this->isStop)
                     return;
                 this->isStop = true;
-                for (int i = 0, n = this->size(); i < n; ++i) {
+                for (size_t i = 0, n = this->size(); i < n; ++i) {
                     *this->flags[i] = true;  // command the threads to stop
                 }
                 this->clear_queue();  // empty the queue
@@ -158,7 +158,7 @@ namespace ctpl {
                 std::unique_lock<std::mutex> lock(this->mutex);
                 this->cv.notify_all();  // stop all waiting threads
             }
-            for (int i = 0; i < static_cast<int>(this->threads.size()); ++i) {  // wait for the computing threads to finish
+            for (size_t i = 0; i < static_cast<size_t>(this->threads.size()); ++i) {  // wait for the computing threads to finish
                     if (this->threads[i]->joinable())
                         this->threads[i]->join();
             }
@@ -206,7 +206,7 @@ namespace ctpl {
         thread_pool & operator=(const thread_pool &);// = delete;
         thread_pool & operator=(thread_pool &&);// = delete;
 
-        void set_thread(int i) {
+        void set_thread(size_t i) {
             std::shared_ptr<std::atomic<bool>> flag(this->flags[i]); // a copy of the shared ptr to the flag
             auto f = [this, i, flag/* a copy of the shared ptr to the flag */]() {
                 std::atomic<bool> & _flag = *flag;
@@ -215,7 +215,7 @@ namespace ctpl {
                 while (true) {
                     while (isPop) {  // if there is anything in the queue
                         std::unique_ptr<std::function<void(int id)>> func(_f); // at return, delete the function even if an exception occurred
-                        (*_f)(i);
+                        (*_f)(static_cast<int>(i));
                         if (_flag)
                             return;  // the thread is wanted to stop, return even if the queue is not empty yet
                         else

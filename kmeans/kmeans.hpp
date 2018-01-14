@@ -109,6 +109,9 @@ namespace clustering {
 				}
 			}
 			
+			// vector of futures that will be reused
+			std::vector<std::future<void>> futures(tpool.size());
+			
 			// MARK: kmeans++ initialization
 			{
 				// using vector because stack might be overflowed for this size of data
@@ -120,13 +123,8 @@ namespace clustering {
 				centers[0] = elements[firstCenter];
 				
 				for(size_t cidx = 1; cidx < centers.size(); ++cidx) {
-					std::vector<std::future<void>> futures;
-					
-					futures.reserve(tpool.size());
-					
 					// 2. for every point calc its squared distance to closest already chosen centroid and sum of these squares
-					const auto task = [&elements, &centers, &sqdistances, cidx](size_t id, const auto firstidx, const auto lastidx) -> void {
-						OUT("Running task on thread#" + std::to_string(id) + " first=" + std::to_string(firstidx) + " last=" + std::to_string(lastidx));
+					const auto task = [&elements, &centers, &sqdistances, cidx](size_t, const auto firstidx, const auto lastidx) {
 						for(size_t eidx = firstidx; eidx < lastidx; ++eidx) {
 							// calc distance to every chosen centroid and pick shortest
 							auto shortestDistSq = distance(elements[eidx], centers[0]);
@@ -149,7 +147,7 @@ namespace clustering {
 					const auto blockSize = size_t(std::ceil(static_cast<float>(elements.size()) / tpool.size()) + 0.5);
 					
 					for(size_t eidx = 0; eidx < elements.size(); eidx += blockSize) {
-						futures.push_back(tpool.push(task, eidx, std::min(elements.size(), eidx + blockSize)));
+						futures[eidx / blockSize] = std::move(tpool.push(task, eidx, std::min(elements.size(), eidx + blockSize)));
 					}
 					
 					// wait until completion
@@ -173,8 +171,6 @@ namespace clustering {
 				}
 			}
 			
-//			for(auto& c : centers)
-//				OUTELEM(c);
 			// MARK: kmeans clustering
 			{
 				auto iterNum = int32_t{0};
@@ -188,26 +184,43 @@ namespace clustering {
 						pair.second = 0;
 					
 					// MARK: assign every point to closest centroid
-					for(size_t eidx = 0; eidx < elements.size(); ++eidx) {
-						// calc distance to every centroid and pick shortest
-						auto shortestDist = std::numeric_limits<BaseType>::max();
-						auto closestCenterIdx = size_t{0};
-						
-						for(size_t cidx = 0; cidx < centers.size(); ++cidx) {
-							const auto dist = distance(elements[eidx], centers[cidx]);
+					const auto task = [&elements, &centers, &elementToClusterMap](size_t, const auto firstidx, const auto lastidx) {
+						//						OUT("Running task on thread#" + std::to_string(id) + " first=" + std::to_string(firstidx) + " last=" + std::to_string(lastidx));
+						for(size_t eidx = firstidx; eidx < lastidx; ++eidx) {
+							// calc distance to every centroid and pick shortest
+							auto shortestDist = std::numeric_limits<BaseType>::max();
+							auto closestCenterIdx = size_t{0};
 							
-							// remember closest centroid
-							if(dist < shortestDist) {
-								shortestDist = dist;
-								closestCenterIdx = cidx;
+							for(size_t cidx = 0; cidx < centers.size(); ++cidx) {
+								const auto dist = distance(elements[eidx], centers[cidx]);
+								
+								// remember closest centroid
+								if(dist < shortestDist) {
+									shortestDist = dist;
+									closestCenterIdx = cidx;
+								}
 							}
+							
+							// assign to closest centroid
+							elementToClusterMap[eidx] = closestCenterIdx;
 						}
-						
-						// assign to closest centroid
-						elementToClusterMap[eidx] = closestCenterIdx;
-						
-						// adjust centroid
+					};
+					
+					// split into task for every thread
+					const auto blockSize = size_t(std::ceil(static_cast<float>(elements.size()) / tpool.size()) + 0.5);
+					
+					for(size_t eidx = 0; eidx < elements.size(); eidx += blockSize) {
+						futures[eidx / blockSize] = std::move(tpool.push(task, eidx, std::min(elements.size(), eidx + blockSize)));
+					}
+					
+					// wait until completion
+					for(const auto& future : futures)
+						future.wait();
+					
+					// adjust centroid
+					for(size_t eidx = 0; eidx < elements.size(); ++eidx) {
 						auto weighted = elements[eidx];
+						const auto closestCenterIdx = elementToClusterMap[eidx];
 						
 						++clusterAvgAndCountOfElements[closestCenterIdx].second;
 						mul(weighted, BaseType{1} / clusterAvgAndCountOfElements[closestCenterIdx].second);

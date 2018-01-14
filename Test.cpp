@@ -19,8 +19,8 @@ using namespace clustering;
 
 // MARK: Settings
 struct Constant {
-	static constexpr auto dimNum = 5;//20;
-	static constexpr auto batchSize = 1103;//10000;
+	static constexpr auto dimNum = 20;
+	static constexpr auto batchSize = 10003;
 	static constexpr auto centerCount = 10;
 	static constexpr auto benchRuns = 10;
 };
@@ -96,7 +96,7 @@ void kmeansTest() {
 	for(size_t idx = 0; idx < elementToClusterMap.size(); idx += step) {
 		const auto cluster = elementToClusterMap[idx];
 		
-		for(size_t jdx = 1; jdx < step; ++jdx) {
+		for(size_t jdx = 1; jdx < step && idx + jdx < elementToClusterMap.size(); ++jdx) {
 			REQUIRE(elementToClusterMap[idx + jdx] == cluster);
 		}
 	}
