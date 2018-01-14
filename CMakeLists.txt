@@ -2,26 +2,7 @@ cmake_minimum_required(VERSION 3.7)
 project(kmeans CXX)
 
 # set flags
-set(CMAKE_CXX_FLAGS 
-	"${CMAKE_CXX_FLAGS}
-    -std=c++1z
-    -Werror
-    -Wall
-    -Wextra
-    -Wpedantic
-    -Wcast-align
-    -Wcast-qual
-    -Wconversion
-    -Wctor-dtor-privacy
-    -Wenum-compare
-    -Wfloat-equal
-    -Wnon-virtual-dtor
-    -Wold-style-cast
-    -Woverloaded-virtual
-    -Wredundant-decls
-    -Wsign-conversion
-    -Wsign-promo
-    -Wno-unused-function")
+set(CMAKE_CXX_FLAGS "-std=c++1z -Werror -Wall -Wextra -Wpedantic -Wcast-align -Wcast-qual -Wconversion -Wctor-dtor-privacy -Wenum-compare -Wfloat-equal -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wsign-conversion -Wsign-promo -Wno-unused-function")
 
 # create interface lib
 set(KMEANS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/kmeans)
@@ -44,13 +25,13 @@ add_executable(tests ${TEST_SOURCES})
 target_link_libraries(tests PRIVATE Catch kmeans)
 
 # Run test automatically as post build step
-#add_custom_command(
- #    TARGET tests
-  #   COMMENT "Run kmeans tests"
-   #  POST_BUILD 
-    # WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-     #COMMAND tests
-#)
+add_custom_command(
+	TARGET tests
+	COMMENT "Run kmeans tests"
+	POST_BUILD 
+	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+	COMMAND tests
+)
 
 # install
 install(DIRECTORY ${KMEANS_INCLUDE_DIR}
